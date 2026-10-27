@@ -1,4 +1,4 @@
--- The five services with the highest usage charges, across every provider.
+-- The five largest usage charges by provider, service and service category.
 SELECT ProviderName AS provider,
        ServiceName AS service,
        ServiceCategory AS category,
