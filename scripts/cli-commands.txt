@@ -7,4 +7,5 @@ aws ce get-anomaly-monitors  --query 'AnomalyMonitors[].[MonitorName,MonitorType
 aws ce get-anomalies --date-interval StartDate=2026-10-01,EndDate=2026-10-27  --query 'Anomalies[].[AnomalyStartDate,DimensionValue,Impact.TotalImpact]' --output text
 aws ce update-cost-allocation-tags-status --cost-allocation-tags-status  TagKey=team,Status=Active TagKey=service,Status=Active TagKey=environment,Status=Active  TagKey=cost-center,Status=Active TagKey=owner,Status=Active
 aws ce start-cost-allocation-tag-backfill --backfill-from 2026-01-01T00:00:00Z
+aws ce create-anomaly-monitor --anomaly-monitor  '{"MonitorName": "by-service", "MonitorType": "DIMENSIONAL", "MonitorDimension": "TAG", "MonitorSpecification": {"Tags": {"Key": "service"}}}'
 aws ce get-cost-and-usage  --time-period Start=2026-10-01,End=2026-10-27  --granularity MONTHLY  --metrics AmortizedCost  --filter '{"Tags": {"Key": "service", "Values": ["checkout"]}}'  --group-by Type=TAG,Key=environment  --query 'ResultsByTime[].Groups[].[Keys[0],Metrics.AmortizedCost.Amount]'  --output text
