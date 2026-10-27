@@ -55,7 +55,10 @@ jobs:
         run: |
           set -euo pipefail
           terraform init -input=false
-          if ! terraform workspace list | grep -Eq "^[* ] $WORKSPACE\$"; then
+          # A failed listing stops the job here instead of looking like
+          # "nothing to destroy".
+          workspaces=$(terraform workspace list)
+          if ! grep -Eq "^[* ] $WORKSPACE\$" <<< "$workspaces"; then
             echo "No workspace $WORKSPACE, nothing to destroy."
             exit 0
           fi

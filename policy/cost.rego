@@ -44,11 +44,23 @@ as_tags(x) := x if is_object(x)
 
 as_tags(x) := {} if x == null
 
-# Tags that are only known after apply cannot be checked, so they fail.
+# Values that are only known after apply cannot be checked, so they fail:
+# resource tags, launch template and Auto Scaling group tags, and instance types.
 deny contains msg if {
 	some rc in changed
-	rc.change.after_unknown.tags_all == true
-	msg := sprintf("%s: tags are unknown until apply; build them from known values", [rc.address])
+	some attribute in ["tags_all", "tag_specifications", "tag", "instance_type"]
+	unknown := object.get(rc.change.after_unknown, attribute, false)
+	some path
+	walk(unknown, [path, true])
+	msg := sprintf("%s: %s is unknown until apply; build it from known values", [rc.address, attribute])
+}
+
+deny contains msg if {
+	some rc in changed
+	rc.type in {"aws_launch_template", "aws_instance"}
+	not rc.change.after.instance_type
+	not rc.change.after_unknown.instance_type
+	msg := sprintf("%s: set an explicit instance_type, so the policy can check it", [rc.address])
 }
 
 tag_sets contains [sprintf("%s (%s)", [rc.address, spec.resource_type]), spec.tags] if {
