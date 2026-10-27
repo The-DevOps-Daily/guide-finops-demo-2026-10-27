@@ -42,6 +42,17 @@ resource "aws_autoscaling_group" "app" {
     version = aws_launch_template.app.latest_version
   }
 
+  # A new launch template version (for example, a new instance type)
+  # replaces the running instances, starting the new ones before it
+  # stops the old ones.
+  instance_refresh {
+    strategy = "Rolling"
+    preferences {
+      min_healthy_percentage = 100
+      max_healthy_percentage = 200
+    }
+  }
+
   # The provider's default_tags skip aws_autoscaling_group, so tag it here.
   dynamic "tag" {
     for_each = local.cost_tags

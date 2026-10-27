@@ -1,9 +1,11 @@
 name: Cost checks
 
 # Plans each environment and checks the plan against policy/cost.rego.
-# Needs a read-only IAM role for `terraform plan`, trusted for this
-# repository through GitHub OIDC, in the repository variable AWS_PLAN_ROLE_ARN.
-# Each environment has its own state in a Terraform workspace of the same name.
+# Needs an IAM role for `terraform plan`, trusted for this repository
+# through GitHub OIDC, in the repository variable AWS_PLAN_ROLE_ARN: read
+# access to the resources and the state, plus write and delete on the state
+# lock files. Each environment has its own state in a Terraform workspace of
+# the same name. Make the "Cost checks result" job a required check.
 
 on:
   pull_request:
@@ -12,10 +14,9 @@ permissions:
   contents: read
 
 jobs:
-  # Runs on every pull request, so the required checks always report. The
-  # plan jobs below are skipped (which counts as passing) when infra/ and
-  # policy/ did not change.
+  # Runs on every pull request, so that the result job below always reports.
   changes:
+    if: vars.AWS_PLAN_ROLE_ARN != ''
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -39,7 +40,7 @@ jobs:
 
   plan:
     needs: changes
-    if: needs.changes.outputs.infra == 'true' && vars.AWS_PLAN_ROLE_ARN != ''
+    if: needs.changes.outputs.infra == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -87,3 +88,20 @@ jobs:
       - name: Check the plan against the cost policy
         working-directory: infra
         run: conftest test plan.json --policy ../policy
+
+  # One check with a fixed name: it passes when nothing in infra/ or policy/
+  # changed, and otherwise only when every environment's plan passed.
+  result:
+    name: Cost checks result
+    if: always() && vars.AWS_PLAN_ROLE_ARN != ''
+    needs: [changes, plan]
+    runs-on: ubuntu-24.04
+    steps:
+      - env:
+          CHANGES: ${{ needs.changes.result }}
+          INFRA: ${{ needs.changes.outputs.infra }}
+          PLAN: ${{ needs.plan.result }}
+        run: |
+          echo "change detection: $CHANGES, infra or policy changed: $INFRA, plans: $PLAN"
+          if [ "$CHANGES" != success ]; then exit 1; fi
+          if [ "$INFRA" = true ] && [ "$PLAN" != success ]; then exit 1; fi

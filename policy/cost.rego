@@ -12,6 +12,19 @@ allowed_instance_types := {
 
 required_tags := {"team", "service", "environment", "cost-center", "owner"}
 
+# The environment comes from the plan's input variable, not from a tag that
+# a resource could override.
+environment := input.variables.environment.value
+
+deny contains "the plan has no environment variable" if {
+	not input.variables.environment.value
+}
+
+deny contains msg if {
+	not allowed_instance_types[environment]
+	msg := sprintf("environment %q has no list of allowed instance types", [environment])
+}
+
 # Resources that this plan creates or updates.
 changed contains rc if {
 	some rc in input.resource_changes
@@ -40,6 +53,12 @@ tag_sets contains [rc.address, {t.key: t.value | some t in rc.change.after.tag}]
 
 deny contains msg if {
 	some [address, tags] in tag_sets
+	tags.environment != environment
+	msg := sprintf("%s: environment tag %q does not match the environment %q", [address, tags.environment, environment])
+}
+
+deny contains msg if {
+	some [address, tags] in tag_sets
 	present := {key | some key, value in tags; trim_space(value) != ""}
 	missing := required_tags - present
 	count(missing) > 0
@@ -58,11 +77,10 @@ deny contains msg if {
 deny contains msg if {
 	some rc in changed
 	rc.type == "aws_launch_template"
-	env := rc.change.after.tags_all.environment
 	itype := rc.change.after.instance_type
-	not itype in allowed_instance_types[env]
-	allowed := concat(", ", sort(allowed_instance_types[env]))
-	msg := sprintf("%s: %s is not allowed in %s (allowed: %s)", [rc.address, itype, env, allowed])
+	not itype in allowed_instance_types[environment]
+	allowed := concat(", ", sort(allowed_instance_types[environment]))
+	msg := sprintf("%s: %s is not allowed in %s (allowed: %s)", [rc.address, itype, environment, allowed])
 }
 
 # gp3 costs less per GB than gp2 for EBS volumes.
@@ -86,6 +104,6 @@ warn contains msg if {
 	some rc in changed
 	rc.type == "aws_db_instance"
 	rc.change.after.multi_az == true
-	rc.change.after.tags_all.environment != "prod"
+	environment != "prod"
 	msg := sprintf("%s: Multi-AZ doubles the instance cost; is it needed outside prod?", [rc.address])
 }
