@@ -7,7 +7,7 @@ SELECT ProviderName AS provider,
 FROM (
   SELECT ProviderName, Tags, BilledCost, unnest(json_keys(Tags)) AS tag_key
   FROM focus
-  WHERE ChargeCategory = 'Usage'
+  WHERE lower(ChargeCategory) = 'usage'
 )
 WHERE lower(trim(tag_key)) IN ('env', 'environment')
 GROUP BY ALL

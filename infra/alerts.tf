@@ -2,16 +2,16 @@ resource "aws_sns_topic" "cost_alerts" {
   name = "${local.name}-cost-alerts"
 }
 
-# AWS Budgets and Cost Anomaly Detection publish to the topic.
+# AWS Budgets publishes to the topic, for this account only.
 data "aws_iam_policy_document" "cost_alerts" {
   statement {
-    sid       = "AllowCostServicesToPublish"
+    sid       = "AllowBudgetsToPublish"
     actions   = ["SNS:Publish"]
     resources = [aws_sns_topic.cost_alerts.arn]
 
     principals {
       type        = "Service"
-      identifiers = ["budgets.amazonaws.com", "costalerts.amazonaws.com"]
+      identifiers = ["budgets.amazonaws.com"]
     }
 
     condition {
@@ -72,46 +72,4 @@ resource "aws_budgets_budget" "service" {
     notification_type         = "ACTUAL"
     subscriber_sns_topic_arns = [aws_sns_topic.cost_alerts.arn]
   }
-}
-
-resource "aws_ce_anomaly_monitor" "service" {
-  name         = local.name
-  monitor_type = "CUSTOM"
-
-  # Watches only the costs tagged with this service. The null keys match
-  # what the API returns and keep the plan free of false changes.
-  monitor_specification = jsonencode({
-    And            = null
-    CostCategories = null
-    Dimensions     = null
-    Not            = null
-    Or             = null
-    Tags = {
-      Key          = "service"
-      MatchOptions = null
-      Values       = [var.service]
-    }
-  })
-}
-
-resource "aws_ce_anomaly_subscription" "service" {
-  name             = local.name
-  frequency        = "IMMEDIATE"
-  monitor_arn_list = [aws_ce_anomaly_monitor.service.arn]
-
-  subscriber {
-    type    = "SNS"
-    address = aws_sns_topic.cost_alerts.arn
-  }
-
-  # Alert when an anomaly's total impact reaches 50 USD.
-  threshold_expression {
-    dimension {
-      key           = "ANOMALY_TOTAL_IMPACT_ABSOLUTE"
-      match_options = ["GREATER_THAN_OR_EQUAL"]
-      values        = ["50"]
-    }
-  }
-
-  depends_on = [aws_sns_topic_policy.cost_alerts]
 }

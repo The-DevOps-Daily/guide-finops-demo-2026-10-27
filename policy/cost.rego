@@ -19,6 +19,42 @@ changed contains rc if {
 	action in {"create", "update"}
 }
 
+# Every set of tags that ends up on billed resources: the tags of each
+# resource, the tags a launch template gives to the instances and volumes
+# it launches, and the tags of an Auto Scaling group.
+tag_sets contains [rc.address, rc.change.after.tags_all] if {
+	some rc in changed
+	is_object(rc.change.after.tags_all)
+}
+
+tag_sets contains [sprintf("%s (%s)", [rc.address, spec.resource_type]), spec.tags] if {
+	some rc in changed
+	rc.type == "aws_launch_template"
+	some spec in rc.change.after.tag_specifications
+}
+
+tag_sets contains [rc.address, {t.key: t.value | some t in rc.change.after.tag}] if {
+	some rc in changed
+	rc.type == "aws_autoscaling_group"
+}
+
+deny contains msg if {
+	some [address, tags] in tag_sets
+	present := {key | some key, value in tags; trim_space(value) != ""}
+	missing := required_tags - present
+	count(missing) > 0
+	msg := sprintf("%s: missing cost tags: %s", [address, concat(", ", sort(missing))])
+}
+
+deny contains msg if {
+	some rc in changed
+	rc.type == "aws_launch_template"
+	tagged := {spec.resource_type | some spec in rc.change.after.tag_specifications}
+	missing := {"instance", "volume"} - tagged
+	count(missing) > 0
+	msg := sprintf("%s: no tag_specifications for: %s", [rc.address, concat(", ", sort(missing))])
+}
+
 deny contains msg if {
 	some rc in changed
 	rc.type == "aws_launch_template"
@@ -29,19 +65,21 @@ deny contains msg if {
 	msg := sprintf("%s: %s is not allowed in %s (allowed: %s)", [rc.address, itype, env, allowed])
 }
 
-deny contains msg if {
-	some rc in changed
-	tags := rc.change.after.tags_all
-	missing := required_tags - {key | some key, _ in tags}
-	count(missing) > 0
-	msg := sprintf("%s: missing cost tags: %s", [rc.address, concat(", ", sort(missing))])
-}
-
+# gp3 costs less per GB than gp2 for EBS volumes.
 deny contains msg if {
 	some rc in changed
 	rc.type == "aws_ebs_volume"
 	rc.change.after.type == "gp2"
-	msg := sprintf("%s: use gp3, which costs less per GB than gp2", [rc.address])
+	msg := sprintf("%s: use gp3 instead of gp2", [rc.address])
+}
+
+deny contains msg if {
+	some rc in changed
+	rc.type == "aws_launch_template"
+	some mapping in rc.change.after.block_device_mappings
+	some ebs in mapping.ebs
+	ebs.volume_type == "gp2"
+	msg := sprintf("%s: %s uses gp2; use gp3 instead", [rc.address, mapping.device_name])
 }
 
 warn contains msg if {

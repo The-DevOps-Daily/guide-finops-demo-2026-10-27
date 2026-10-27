@@ -1,6 +1,6 @@
 -- Showback by environment. Usage without a usable environment tag is
 -- shared out in proportion to each environment's tagged cost, so the
--- report still adds up to the bill.
+-- report still adds up to the total usage cost.
 WITH direct AS (
   SELECT coalesce(env, 'untagged') AS environment,
          sum(BilledCost) AS cost

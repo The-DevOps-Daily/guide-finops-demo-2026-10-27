@@ -11,14 +11,30 @@ policies:
     filters:
       - AssociationId: absent
 
-  - name: ec2-missing-owner
+  # Marks running instances without an owner tag once; the stop date is
+  # four days after the first run that finds them.
+  - name: ec2-missing-owner-mark
     resource: aws.ec2
-    description: Running instances without an owner tag are marked, then stopped after 4 days.
+    description: Running instances without an owner tag get a stop date.
     filters:
       - State.Name: running
       - 'tag:owner': absent
+      - 'tag:c7n-missing-owner': absent
     actions:
       - type: mark-for-op
         tag: c7n-missing-owner
         op: stop
         days: 4
+
+  # Stops marked instances whose date has passed and that still have no owner.
+  - name: ec2-missing-owner-stop
+    resource: aws.ec2
+    description: Stops instances whose grace period ended without an owner tag.
+    filters:
+      - State.Name: running
+      - 'tag:owner': absent
+      - type: marked-for-op
+        tag: c7n-missing-owner
+        op: stop
+    actions:
+      - stop

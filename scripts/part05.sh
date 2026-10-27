@@ -2,6 +2,7 @@
 tf_mock
 cap p05-cd 'cd infra'
 must 'terraform init -input=false > /dev/null'
+must 'terraform workspace select -or-create dev > /dev/null'
 cap p05-plan 'terraform plan -var-file=env/dev.tfvars -out=tfplan > /dev/null && terraform show -json tfplan > plan.json'
 cap p05-conftest-pass 'conftest test plan.json --policy ../policy'
 cap p05-plan-big 'terraform plan -var-file=env/dev.tfvars -var instance_type=m7i.2xlarge -out=tfplan > /dev/null && terraform show -json tfplan > plan.json'

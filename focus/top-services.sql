@@ -4,7 +4,7 @@ SELECT ProviderName AS provider,
        ServiceCategory AS category,
        round(sum(BilledCost), 2) AS billed_usd
 FROM focus
-WHERE ChargeCategory = 'Usage'
+WHERE lower(ChargeCategory) = 'usage'
 GROUP BY ALL
 ORDER BY billed_usd DESC
 LIMIT 5;

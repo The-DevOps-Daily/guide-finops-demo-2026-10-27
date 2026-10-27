@@ -1,5 +1,7 @@
--- One environment column for every provider: accept the key spellings
--- found in the data, and map the values onto a fixed list.
+-- Usage charges with one environment column for every provider. The
+-- category is compared in lower case (Google Cloud writes "usage"), the
+-- key spellings found in the data are accepted, and the values are
+-- mapped onto a fixed list.
 CREATE OR REPLACE VIEW usage AS
 SELECT *,
        CASE lower(trim(coalesce(
@@ -13,4 +15,4 @@ SELECT *,
          WHEN 'development' THEN 'dev'
        END AS env
 FROM focus
-WHERE ChargeCategory = 'Usage';
+WHERE lower(ChargeCategory) = 'usage';

@@ -3,21 +3,47 @@ name: Cost checks
 # Plans each environment and checks the plan against policy/cost.rego.
 # Needs a read-only IAM role for `terraform plan`, trusted for this
 # repository through GitHub OIDC, in the repository variable AWS_PLAN_ROLE_ARN.
+# Each environment has its own state in a Terraform workspace of the same name.
 
 on:
   pull_request:
-    paths:
-      - 'infra/**'
-      - 'policy/**'
 
 permissions:
   contents: read
-  id-token: write
 
 jobs:
-  plan:
-    if: vars.AWS_PLAN_ROLE_ARN != ''
+  # Runs on every pull request, so the required checks always report. The
+  # plan jobs below are skipped (which counts as passing) when infra/ and
+  # policy/ did not change.
+  changes:
     runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      pull-requests: read
+    outputs:
+      infra: ${{ steps.diff.outputs.infra }}
+    steps:
+      - id: diff
+        env:
+          GH_TOKEN: ${{ github.token }}
+          PR: ${{ github.event.pull_request.number }}
+          REPO: ${{ github.repository }}
+        run: |
+          set -euo pipefail
+          files=$(gh pr diff "$PR" --repo "$REPO" --name-only)
+          if grep -Eq '^(infra|policy)/' <<< "$files"; then
+            echo "infra=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "infra=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  plan:
+    needs: changes
+    if: needs.changes.outputs.infra == 'true' && vars.AWS_PLAN_ROLE_ARN != ''
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: read
+      id-token: write
     strategy:
       fail-fast: false
       matrix:
@@ -52,7 +78,9 @@ jobs:
         env:
           ENVIRONMENT: ${{ matrix.environment }}
         run: |
+          set -euo pipefail
           terraform init -input=false
+          terraform workspace select "$ENVIRONMENT"
           terraform plan -input=false -var-file="env/$ENVIRONMENT.tfvars" -out=tfplan
           terraform show -json tfplan > plan.json
 

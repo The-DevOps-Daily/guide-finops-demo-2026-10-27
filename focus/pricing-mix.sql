@@ -6,7 +6,7 @@ SELECT PricingCategory AS pricing,
        round(100 * sum(ListCost) / sum(sum(ListCost)) OVER (), 1) AS share_pct
 FROM focus
 WHERE ProviderName = 'AWS'
-  AND ChargeCategory = 'Usage'
+  AND lower(ChargeCategory) = 'usage'
   AND ServiceCategory = 'Compute'
 GROUP BY ALL
 ORDER BY list_usd DESC;
