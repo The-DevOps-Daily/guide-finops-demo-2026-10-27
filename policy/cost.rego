@@ -125,6 +125,15 @@ deny contains msg if {
 	msg := sprintf("%s: %s uses gp2; use gp3 instead", [rc.address, mapping.device_name])
 }
 
+deny contains msg if {
+	some rc in changed
+	rc.type == "aws_instance"
+	some block in ["root_block_device", "ebs_block_device"]
+	some device in object.get(rc.change.after, block, [])
+	device.volume_type == "gp2"
+	msg := sprintf("%s: %s uses gp2; use gp3 instead", [rc.address, block])
+}
+
 warn contains msg if {
 	some rc in changed
 	rc.type == "aws_db_instance"
