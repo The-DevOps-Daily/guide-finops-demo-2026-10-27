@@ -8,7 +8,8 @@ name: Cost checks
 # access to the state lock. Each GitHub environment below holds its own
 # AWS_PLAN_ROLE_ARN variable, and each role trusts only its environment
 # through the OIDC subject (repo:<org>/<repo>:environment:plan-nonprod or
-# :plan-prod). Give plan-prod required reviewers.
+# :plan-prod). Give plan-prod required reviewers. A pull request can edit
+# this file, so the read-only permissions are the boundary for these roles.
 #
 # Turn it on with the repository variable COST_CHECKS_ENABLED=true, and make
 # "Cost checks result" a required check.
