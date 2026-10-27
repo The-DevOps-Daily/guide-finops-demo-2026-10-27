@@ -1,0 +1,24 @@
+policies:
+  - name: ebs-unattached
+    resource: aws.ebs
+    description: EBS volumes that are not attached to any instance.
+    filters:
+      - State: available
+
+  - name: eip-unassociated
+    resource: aws.network-addr
+    description: Elastic IP addresses that are allocated but not associated.
+    filters:
+      - AssociationId: absent
+
+  - name: ec2-missing-owner
+    resource: aws.ec2
+    description: Running instances without an owner tag are marked, then stopped after 4 days.
+    filters:
+      - State.Name: running
+      - 'tag:owner': absent
+    actions:
+      - type: mark-for-op
+        tag: c7n-missing-owner
+        op: stop
+        days: 4

@@ -1,0 +1,63 @@
+# checkout-api reserves far more CPU and memory than it uses.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: checkout
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: checkout-api
+  namespace: checkout
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: checkout-api
+  template:
+    metadata:
+      labels:
+        app: checkout-api
+    spec:
+      containers:
+        - name: api
+          image: nginx:1.30.6-alpine
+          resources:
+            requests:
+              cpu: 500m
+              memory: 512Mi
+            limits:
+              memory: 512Mi
+---
+# report-builder uses more CPU than it requests.
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: reports
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: report-builder
+  namespace: reports
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: report-builder
+  template:
+    metadata:
+      labels:
+        app: report-builder
+    spec:
+      containers:
+        - name: builder
+          image: busybox:1.38.0
+          command: ['sh', '-c', 'while true; do :; done']
+          resources:
+            requests:
+              cpu: 100m
+              memory: 64Mi
+            limits:
+              cpu: 400m
+              memory: 64Mi

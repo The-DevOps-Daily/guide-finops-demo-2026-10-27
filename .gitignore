@@ -1,0 +1,12 @@
+captures/
+out/
+*.duckdb
+*.duckdb.wal
+focus_sample_*.csv.gz
+.terraform/
+*.tfplan
+tfplan
+plan.json
+infra/mock_provider_override.tf
+moto.log
+pf.log

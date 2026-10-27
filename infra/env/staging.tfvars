@@ -1,0 +1,10 @@
+environment          = "staging"
+team                 = "payments"
+service              = "checkout"
+cost_center          = "cc-1042"
+owner                = "payments-oncall@example.com"
+alert_email          = "payments-oncall@example.com"
+monthly_budget_usd   = 300
+ami_id               = "ami-0123456789abcdef0"
+subnet_ids           = ["subnet-0aaaa1111bbbb2222", "subnet-0cccc3333dddd4444"]
+db_subnet_group_name = "checkout-staging"

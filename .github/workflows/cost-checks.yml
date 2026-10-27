@@ -1,0 +1,61 @@
+name: Cost checks
+
+# Plans each environment and checks the plan against policy/cost.rego.
+# Needs a read-only IAM role for `terraform plan`, trusted for this
+# repository through GitHub OIDC, in the repository variable AWS_PLAN_ROLE_ARN.
+
+on:
+  pull_request:
+    paths:
+      - 'infra/**'
+      - 'policy/**'
+
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  plan:
+    if: vars.AWS_PLAN_ROLE_ARN != ''
+    runs-on: ubuntu-24.04
+    strategy:
+      fail-fast: false
+      matrix:
+        environment: [dev, staging, prod]
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          role-to-assume: ${{ vars.AWS_PLAN_ROLE_ARN }}
+          aws-region: us-east-1
+
+      - uses: hashicorp/setup-terraform@dfe3c3f87815947d99a8997f908cb6525fc44e9e # v4.0.1
+        with:
+          terraform_version: 1.17.0
+          terraform_wrapper: false
+
+      - name: Install conftest
+        run: |
+          set -euo pipefail
+          cd "$(mktemp -d)"
+          curl -fsSLO https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/conftest_0.71.1_Linux_x86_64.tar.gz
+          curl -fsSLO https://github.com/open-policy-agent/conftest/releases/download/v0.71.1/checksums.txt
+          grep ' conftest_0.71.1_Linux_x86_64.tar.gz$' checksums.txt | sha256sum -c
+          tar -xzf conftest_0.71.1_Linux_x86_64.tar.gz conftest
+          sudo install -m 0755 conftest /usr/local/bin/conftest
+
+      - name: Plan ${{ matrix.environment }}
+        working-directory: infra
+        env:
+          ENVIRONMENT: ${{ matrix.environment }}
+        run: |
+          terraform init -input=false
+          terraform plan -input=false -var-file="env/$ENVIRONMENT.tfvars" -out=tfplan
+          terraform show -json tfplan > plan.json
+
+      - name: Check the plan against the cost policy
+        working-directory: infra
+        run: conftest test plan.json --policy ../policy

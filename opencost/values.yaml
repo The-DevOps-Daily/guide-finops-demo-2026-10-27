@@ -1,0 +1,11 @@
+# OpenCost without Prometheus: the collector data source scrapes the
+# cluster itself. Without a cloud provider (kind), OpenCost uses its
+# default prices; set customPricing for your own rates.
+opencost:
+  exporter:
+    defaultClusterId: kind-finops
+    collectorDataSource:
+      enabled: true
+      scrapeInterval: 30s
+  ui:
+    enabled: false

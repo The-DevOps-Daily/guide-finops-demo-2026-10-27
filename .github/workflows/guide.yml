@@ -1,0 +1,70 @@
+name: Guide runs
+
+# Runs the commands from each part of the guide and keeps their output as
+# an artifact. Nothing here talks to a real cloud account.
+
+on:
+  workflow_dispatch:
+    inputs:
+      parts:
+        description: 'Parts to run, as a JSON list such as ["03","04"] (empty runs all)'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-24.04
+    outputs:
+      parts: ${{ steps.parts.outputs.parts }}
+    steps:
+      - id: parts
+        env:
+          PARTS: ${{ inputs.parts }}
+        run: |
+          if [ -z "$PARTS" ]; then
+            PARTS='["01","02","03","03k","04","05","06","07"]'
+          fi
+          echo "parts=$PARTS" >> "$GITHUB_OUTPUT"
+
+  part:
+    needs: plan
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        part: ${{ fromJSON(needs.plan.outputs.parts) }}
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install the tools
+        env:
+          PART: ${{ matrix.part }}
+        run: |
+          case "$PART" in
+            01|02|06|07) TOOLS=duckdb ;;
+            03) TOOLS="duckdb custodian" ;;
+            03k) TOOLS=kind ;;
+            04) TOOLS=terraform ;;
+            05) TOOLS="terraform conftest actionlint" ;;
+            *) TOOLS=all ;;
+          esac
+          TOOLS="$TOOLS" scripts/install-tools.sh
+
+      - name: Run part ${{ matrix.part }}
+        env:
+          PART: ${{ matrix.part }}
+        run: scripts/run.sh "$PART"
+
+      - name: Keep the output
+        if: always()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: captures-${{ matrix.part }}
+          path: captures/
+          retention-days: 30
