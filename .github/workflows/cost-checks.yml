@@ -1,11 +1,17 @@
 name: Cost checks
 
 # Plans each environment and checks the plan against policy/cost.rego.
-# Needs an IAM role for `terraform plan`, trusted for this repository
-# through GitHub OIDC, in the repository variable AWS_PLAN_ROLE_ARN: read
-# access to the resources and the state, plus write and delete on the state
-# lock files. Each environment has its own state in a Terraform workspace of
-# the same name. Make the "Cost checks result" job a required check.
+#
+# A plan runs code from the pull request (providers, data sources), so the
+# AWS roles it uses are read-only: read access to the resources and to the
+# state, nothing else. Plans run with -lock=false, so they need no write
+# access to the state lock. Each GitHub environment below holds its own
+# AWS_PLAN_ROLE_ARN variable, and each role trusts only its environment
+# through the OIDC subject (repo:<org>/<repo>:environment:plan-nonprod or
+# :plan-prod). Give plan-prod required reviewers.
+#
+# Turn it on with the repository variable COST_CHECKS_ENABLED=true, and make
+# "Cost checks result" a required check.
 
 on:
   pull_request:
@@ -16,7 +22,7 @@ permissions:
 jobs:
   # Runs on every pull request, so that the result job below always reports.
   changes:
-    if: vars.AWS_PLAN_ROLE_ARN != ''
+    if: vars.COST_CHECKS_ENABLED == 'true'
     runs-on: ubuntu-24.04
     permissions:
       contents: read
@@ -40,15 +46,26 @@ jobs:
 
   plan:
     needs: changes
-    if: needs.changes.outputs.infra == 'true'
+    # Only for branches of this repository; pull requests from forks get no
+    # cloud credentials.
+    if: >-
+      needs.changes.outputs.infra == 'true' &&
+      github.event.pull_request.head.repo.full_name == github.repository
     runs-on: ubuntu-24.04
+    environment: ${{ matrix.github_environment }}
     permissions:
       contents: read
       id-token: write
     strategy:
       fail-fast: false
       matrix:
-        environment: [dev, staging, prod]
+        include:
+          - environment: dev
+            github_environment: plan-nonprod
+          - environment: staging
+            github_environment: plan-nonprod
+          - environment: prod
+            github_environment: plan-prod
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -82,7 +99,8 @@ jobs:
           set -euo pipefail
           terraform init -input=false
           terraform workspace select "$ENVIRONMENT"
-          terraform plan -input=false -var-file="env/$ENVIRONMENT.tfvars" -out=tfplan
+          terraform plan -input=false -lock=false \
+            -var-file="env/$ENVIRONMENT.tfvars" -var="environment=$ENVIRONMENT" -out=tfplan
           terraform show -json tfplan > plan.json
 
       - name: Check the plan against the cost policy
@@ -93,7 +111,7 @@ jobs:
   # changed, and otherwise only when every environment's plan passed.
   result:
     name: Cost checks result
-    if: always() && vars.AWS_PLAN_ROLE_ARN != ''
+    if: always() && vars.COST_CHECKS_ENABLED == 'true'
     needs: [changes, plan]
     runs-on: ubuntu-24.04
     steps:
@@ -101,7 +119,13 @@ jobs:
           CHANGES: ${{ needs.changes.result }}
           INFRA: ${{ needs.changes.outputs.infra }}
           PLAN: ${{ needs.plan.result }}
+          FORK: ${{ github.event.pull_request.head.repo.full_name != github.repository }}
         run: |
           echo "change detection: $CHANGES, infra or policy changed: $INFRA, plans: $PLAN"
           if [ "$CHANGES" != success ]; then exit 1; fi
-          if [ "$INFRA" = true ] && [ "$PLAN" != success ]; then exit 1; fi
+          if [ "$INFRA" = true ] && [ "$PLAN" != success ]; then
+            if [ "$FORK" = true ]; then
+              echo "::error::Infrastructure changes from a fork are not planned with cloud credentials. A maintainer must push the branch to this repository."
+            fi
+            exit 1
+          fi

@@ -72,4 +72,7 @@ resource "aws_budgets_budget" "service" {
     notification_type         = "ACTUAL"
     subscriber_sns_topic_arns = [aws_sns_topic.cost_alerts.arn]
   }
+
+  # Budgets must be allowed to publish before it sends to the topic.
+  depends_on = [aws_sns_topic_policy.cost_alerts]
 }

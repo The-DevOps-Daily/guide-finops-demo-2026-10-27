@@ -60,6 +60,8 @@ resource "aws_ce_anomaly_monitor" "checkout" {
   name         = "checkout"
   monitor_type = "CUSTOM"
 
+  depends_on = [aws_ce_cost_allocation_tag.cost_tags]
+
   monitor_specification = jsonencode({
     And            = null
     CostCategories = null

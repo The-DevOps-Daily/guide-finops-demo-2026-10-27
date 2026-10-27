@@ -29,6 +29,15 @@ resource "aws_launch_template" "app" {
     resource_type = "volume"
     tags          = local.cost_tags
   }
+
+  lifecycle {
+    # Plans for prod must run in the prod workspace, against prod's state.
+    # Preview workspaces (pr-<number>) use the dev settings.
+    precondition {
+      condition     = terraform.workspace == var.environment || (var.environment == "dev" && startswith(terraform.workspace, "pr-"))
+      error_message = "The workspace must match var.environment: run terraform workspace select ${var.environment}."
+    }
+  }
 }
 
 resource "aws_autoscaling_group" "app" {

@@ -2,9 +2,11 @@ name: Preview cleanup
 
 # Destroys the Terraform workspace of a pull request's preview environment
 # (pr-<number>) when the pull request is closed or merged. The infra/ module
-# in this repository uses fixed names, so this is switched off here. Set the
-# repository variable PREVIEW_ROLE_ARN to an IAM role that can only delete
-# preview resources, trusted for this repository through GitHub OIDC.
+# in this repository uses fixed names, so this is switched off here; turn it
+# on with the repository variable PREVIEW_CLEANUP_ENABLED=true. The GitHub
+# environment preview-cleanup holds PREVIEW_ROLE_ARN: an IAM role that can
+# only delete preview resources and that trusts only that environment
+# through the OIDC subject (repo:<org>/<repo>:environment:preview-cleanup).
 #
 # pull_request_target runs this file as it is on the base branch, and the
 # checkout below is the base branch too, so no code from the pull request
@@ -23,8 +25,9 @@ concurrency:
 
 jobs:
   destroy:
-    if: vars.PREVIEW_ROLE_ARN != ''
+    if: vars.PREVIEW_CLEANUP_ENABLED == 'true'
     runs-on: ubuntu-24.04
+    environment: preview-cleanup
     env:
       WORKSPACE: pr-${{ github.event.pull_request.number }}
     steps:

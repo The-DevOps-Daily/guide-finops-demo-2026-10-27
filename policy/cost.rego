@@ -35,9 +35,20 @@ changed contains rc if {
 # Every set of tags that ends up on billed resources: the tags of each
 # resource, the tags a launch template gives to the instances and volumes
 # it launches, and the tags of an Auto Scaling group.
-tag_sets contains [rc.address, rc.change.after.tags_all] if {
+tag_sets contains [rc.address, as_tags(rc.change.after.tags_all)] if {
 	some rc in changed
-	is_object(rc.change.after.tags_all)
+	"tags_all" in object.keys(rc.change.after)
+}
+
+as_tags(x) := x if is_object(x)
+
+as_tags(x) := {} if x == null
+
+# Tags that are only known after apply cannot be checked, so they fail.
+deny contains msg if {
+	some rc in changed
+	rc.change.after_unknown.tags_all == true
+	msg := sprintf("%s: tags are unknown until apply; build them from known values", [rc.address])
 }
 
 tag_sets contains [sprintf("%s (%s)", [rc.address, spec.resource_type]), spec.tags] if {
@@ -74,9 +85,11 @@ deny contains msg if {
 	msg := sprintf("%s: no tag_specifications for: %s", [rc.address, concat(", ", sort(missing))])
 }
 
+# Covers launch templates and EC2 instances. Extend it if you use
+# mixed instances policies in Auto Scaling groups.
 deny contains msg if {
 	some rc in changed
-	rc.type == "aws_launch_template"
+	rc.type in {"aws_launch_template", "aws_instance"}
 	itype := rc.change.after.instance_type
 	not itype in allowed_instance_types[environment]
 	allowed := concat(", ", sort(allowed_instance_types[environment]))
