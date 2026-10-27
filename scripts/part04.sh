@@ -12,7 +12,7 @@ cap p04-size-dev "echo 'local.size' | terraform console -var-file=env/dev.tfvars
 cap p04-size-prod "echo 'local.size' | terraform console -var-file=env/prod.tfvars"
 cap p04-cd-back 'cd ..'
 
-must 'terraform -chdir=multicloud/azure init -input=false > /dev/null'
-must 'terraform -chdir=multicloud/google init -input=false > /dev/null'
+cap p04-azure-init 'terraform -chdir=multicloud/azure init'
+cap p04-google-init 'terraform -chdir=multicloud/google init'
 cap p04-azure-validate 'terraform -chdir=multicloud/azure validate'
 cap p04-google-validate 'terraform -chdir=multicloud/google validate'
