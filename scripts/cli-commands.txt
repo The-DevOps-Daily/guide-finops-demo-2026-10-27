@@ -1,0 +1,10 @@
+aws compute-optimizer get-ec2-instance-recommendations  --filters name=Finding,values=Overprovisioned  --query 'instanceRecommendations[].[instanceArn,currentInstanceType,recommendationOptions[0].instanceType]'  --output text
+aws ec2 describe-volumes --filters Name=status,Values=available  --query 'Volumes[].[VolumeId,Size,CreateTime]' --output text
+aws ec2 describe-addresses --query 'Addresses[?AssociationId==null].[PublicIp,AllocationId]' --output text
+aws ec2 describe-snapshots --owner-ids self  --query 'sort_by(Snapshots,&StartTime)[].[SnapshotId,VolumeSize,StartTime]' --output text
+aws ec2 describe-nat-gateways --filter Name=state,Values=available  --query 'NatGateways[].[NatGatewayId,VpcId,CreateTime]' --output text
+aws ce get-anomaly-monitors  --query 'AnomalyMonitors[].[MonitorName,MonitorType,MonitorDimension]' --output text
+aws ce get-anomalies --date-interval StartDate=2026-10-01,EndDate=2026-10-27  --query 'Anomalies[].[AnomalyStartDate,DimensionValue,Impact.TotalImpact]' --output text
+aws ce update-cost-allocation-tags-status --cost-allocation-tags-status  TagKey=team,Status=Active TagKey=service,Status=Active TagKey=environment,Status=Active  TagKey=cost-center,Status=Active TagKey=owner,Status=Active
+aws ce start-cost-allocation-tag-backfill --backfill-from 2026-01-01T00:00:00Z
+aws ce get-cost-and-usage  --time-period Start=2026-10-01,End=2026-10-27  --granularity MONTHLY  --metrics AmortizedCost  --filter '{"Tags": {"Key": "service", "Values": ["checkout"]}}'  --group-by Type=TAG,Key=environment  --query 'ResultsByTime[].Groups[].[Keys[0],Metrics.AmortizedCost.Amount]'  --output text

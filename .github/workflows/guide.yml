@@ -25,7 +25,7 @@ jobs:
           PARTS: ${{ inputs.parts }}
         run: |
           if [ -z "$PARTS" ]; then
-            PARTS='["01","02","03","03k","04","05","06","07"]'
+            PARTS='["01","02","03","03k","04","05","06","07","cli"]'
           fi
           echo "parts=$PARTS" >> "$GITHUB_OUTPUT"
 
@@ -52,6 +52,7 @@ jobs:
             03k) TOOLS=kind ;;
             04) TOOLS=terraform ;;
             05) TOOLS="terraform conftest actionlint" ;;
+            cli) TOOLS=none ;;
             *) TOOLS=all ;;
           esac
           TOOLS="$TOOLS" scripts/install-tools.sh
